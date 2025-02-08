@@ -1,15 +1,64 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function SyllabusUpload() {
   const [subject, setSubject] = useState('')
   const [fileName, setFileName] = useState('')
+  const [fileContent, setFileContent] = useState<ArrayBuffer | null>(null)
+  const [storedFiles, setStoredFiles] = useState<string[]>([])
+  const router = useRouter()
+
+  // Load stored files on component mount
+  useEffect(() => {
+    const syllabusFile = localStorage.getItem('syllabusFile')
+    const storedFileName = localStorage.getItem('syllabusFileName')
+    if (syllabusFile && storedFileName) {
+      setStoredFiles([storedFileName])
+    }
+  }, [])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFileName(e.target.files[0].name)
+      const file = e.target.files[0]
+      setFileName(file.name)
+      
+      // Read the file content
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          // Store the file content in state
+          setFileContent(e.target.result as ArrayBuffer)
+          // Store the file in localStorage (as base64)
+          localStorage.setItem('syllabusFile', btoa(
+            new Uint8Array(e.target.result as ArrayBuffer)
+              .reduce((data, byte) => data + String.fromCharCode(byte), '')
+          ))
+          // Store the filename
+          localStorage.setItem('syllabusFileName', file.name)
+          setStoredFiles([file.name])
+        }
+      }
+      reader.readAsArrayBuffer(file)
     }
+  }
+
+  const handleGenerateClick = () => {
+    if (!fileContent) {
+      alert('Please upload a syllabus file first')
+      return
+    }
+    if (!subject.trim()) {
+      alert('Please enter a subject name')
+      return
+    }
+
+    // Store the subject in localStorage
+    localStorage.setItem('syllabusSubject', subject)
+    
+    // Navigate to suggestions page
+    router.push('/syllabus/suggestions')
   }
 
   return (
@@ -52,6 +101,33 @@ export default function SyllabusUpload() {
             </label>
           </div>
 
+          {/* Stored Files List */}
+          {storedFiles.length > 0 && (
+            <div className="border-2 border-gray-300 rounded-lg p-4">
+              <h2 className="font-medium text-gray-700 mb-2">Uploaded File:</h2>
+              <ul className="space-y-2">
+                {storedFiles.map((name, index) => (
+                  <li key={index} className="flex items-center text-gray-600">
+                    <svg 
+                      className="w-5 h-5 mr-2" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" 
+                      />
+                    </svg>
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Subject Input */}
           <div className="space-y-4">
             <label className="block text-sm font-medium text-gray-700">
@@ -69,7 +145,7 @@ export default function SyllabusUpload() {
           {/* Generate Button */}
           <button
             className="w-full bg-black text-white font-bold py-3 px-6 rounded-md"
-          >
+            onClick={handleGenerateClick}>
             Generate Suggestions
           </button>
         </div>
