@@ -5,7 +5,7 @@ from typing import List, Dict, Optional
 import os
 
 
-class EducationalNewsTools:
+class GetNewsContent:
     def __init__(self, api_key: str):
         """
         Initialize with NewsAPI key
@@ -13,6 +13,14 @@ class EducationalNewsTools:
         """
         self.api_key = api_key
         self.base_url = "https://newsapi.org/v2"
+
+    def _is_educational_safe(self, article: Dict) -> bool:
+        # Add implementation for content safety checking
+        return True
+
+    def _format_for_lesson_plan(self, articles: List[Dict]) -> Dict:
+        # Add implementation for formatting
+        return {"articles": articles}
 
     def get_subject_news(
         self,
@@ -24,18 +32,9 @@ class EducationalNewsTools:
     ) -> Dict:
         """
         Get news articles relevant to a specific subject.
-
-        Args:
-            subject: The academic subject (e.g., 'biology', 'history')
-            days_back: How many days of news to search
-            max_articles: Maximum number of articles to return
-            language: Language of articles
-            safe_mode: If True, applies additional content filtering
         """
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days_back)
-
-        # Add academic context to search
         academic_query = f"{subject} AND (research OR education OR study OR discovery OR development)"
 
         params = {
@@ -53,16 +52,13 @@ class EducationalNewsTools:
             response.raise_for_status()
             articles = response.json()["articles"]
 
-            # Additional filtering for educational content
             if safe_mode:
                 articles = [
                     article
                     for article in articles
                     if self._is_educational_safe(article)
                 ]
-
             return self._format_for_lesson_plan(articles)
-
         except requests.exceptions.RequestException as e:
             print(f"Error fetching news: {e}")
             return {}
@@ -72,14 +68,8 @@ class EducationalNewsTools:
     ) -> Dict:
         """
         Get top current events, optionally filtered by category.
-
-        Args:
-            category: Optional category (e.g., 'science', 'technology', 'health')
-            country: Country code for news sources
-            max_articles: Maximum number of articles to return
         """
         params = {"country": country, "pageSize": max_articles, "apiKey": self.api_key}
-
         if category:
             params["category"] = category
 
@@ -87,7 +77,6 @@ class EducationalNewsTools:
             response = requests.get(f"{self.base_url}/top-headlines", params=params)
             response.raise_for_status()
             return self._format_for_lesson_plan(response.json()["articles"])
-
         except requests.exceptions.RequestException as e:
             print(f"Error fetching current events: {e}")
             return {}
@@ -100,17 +89,14 @@ def main():
         raise ValueError("Please set NEWSAPI_KEY environment variable")
 
     # Initialize the tools
-    edu_tools = EducationalNewsTools(api_key)
+    edu_tools = GetNewsContent(api_key)  # Changed from EducationalNewsTools
 
-    # Example: Generate materials for a biology lesson
-    lesson_materials = edu_tools.generate_lesson_materials(
-        subject="Biology", grade_level="High School", topic="Genetic Engineering"
-    )
+    # Example: Get science news
+    science_news = edu_tools.get_subject_news("biology", days_back=7)
+    current_events = edu_tools.get_current_events(category="science")
 
-    # Save to JSON file
-    with open("lesson_materials.json", "w") as f:
-        json.dump(lesson_materials, f, indent=2)
-        print("Lesson materials saved to lesson_materials.json")
+    print(science_news)
+    print(current_events)
 
 
 if __name__ == "__main__":
