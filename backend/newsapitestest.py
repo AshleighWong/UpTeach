@@ -19,3 +19,5 @@ current_events = edu_tools.get_current_events(category="science")
 
 print(science_news)
 print(current_events)
+
+
