@@ -24,10 +24,10 @@ export default function Home() {
           Upload a Syllabus
         </Link>
         <Link
-          href="/slides"
+          href="/lesson"
           className="bg-black text-white font-serif font-bold py-3 px-12 rounded-3xl text-center text-lg"
         >
-          Upload Slides
+          Upload Lesson
         </Link>
       </div>
     </div>
