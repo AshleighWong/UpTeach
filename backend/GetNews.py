@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import json
 from typing import List, Dict, Optional
 import os
+from flask import jsonify
 
 
 class GetNewsContent:
@@ -97,6 +98,21 @@ def main():
 
     print(science_news)
     print(current_events)
+
+def get():
+    # Get API key from environment variable
+    api_key = os.getenv("NEWSAPI_KEY")
+    if not api_key:
+        raise ValueError("Please set NEWSAPI_KEY environment variable")
+
+    # Initialize the tools
+    edu_tools = GetNewsContent(api_key)  # Changed from EducationalNewsTools
+
+    # Example: Get science news
+    science_news = edu_tools.get_subject_news("biology", days_back=7)
+    current_events = edu_tools.get_current_events(category="science")
+
+    return jsonify(science_news, current_events)
 
 
 if __name__ == "__main__":
