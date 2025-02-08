@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from flask_cors import CORS
 from GetNews import get as get_news
+import openai
 
 # Load environment variables
 load_dotenv()
@@ -74,9 +75,6 @@ def mahin():
 def suggest():
     # Get data from request headers
     data = request.headers.get("data")
-    # Add your logic here
-    return jsonify({"received_data": data})
-
 
     file = data.get('file')
 
