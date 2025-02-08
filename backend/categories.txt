@@ -1,0 +1,9 @@
+For NewsAPI, the categories are actually limited to specific predefined options. Here are the only valid categories you can use:
+
+business
+entertainment
+general
+health
+science
+sports
+technology
