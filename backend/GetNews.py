@@ -102,6 +102,7 @@ def main():
 def get():
     # Get API key from environment variable
     api_key = os.getenv("NEWSAPI_KEY")
+    print(api_key)
     if not api_key:
         raise ValueError("Please set NEWSAPI_KEY environment variable")
 

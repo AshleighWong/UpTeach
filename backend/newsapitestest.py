@@ -1,8 +1,8 @@
 from GetNews import GetNewsContent
 import os
-import dotenv
+from dotenv import load_dotenv
 
-dotenv.load_dotenv()
+load_dotenv()
 
 # Initialize with API key
 edu_tools = GetNewsContent(os.getenv("NEWSAPI_KEY"))

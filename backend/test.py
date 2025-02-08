@@ -4,10 +4,6 @@ from dotenv import load_dotenv
 from flask_cors import CORS
 from GetNews import GetNewsContent
 from openai import OpenAI, OpenAIError
-import base64
-from pptx import Presentation
-from PIL import Image
-import io
 
 # Load environment variables
 load_dotenv()
@@ -28,58 +24,37 @@ client = OpenAI(
 app = Flask(__name__)
 CORS(app)
 
-def convert_slide_to_image(pptx_path, slide_index=0):
-    """Convert a PowerPoint slide to an image"""
-    prs = Presentation(pptx_path)
-    if slide_index >= len(prs.slides):
-        raise ValueError("Slide index out of range")
-    
-    # Create a temporary buffer to save the slide as PNG
-    image_stream = io.BytesIO()
-    # TODO: Add conversion logic here - requires additional setup
-    # For now, we'll use a placeholder image
-    Image.new('RGB', (800, 600), 'white').save(image_stream, format='PNG')
-    image_stream.seek(0)
-    return image_stream.getvalue()
-
 def generate_w_pdfs(file_path, prompt):
     try:
-        # Convert PowerPoint slide to image
-        image_data = convert_slide_to_image(file_path)
-        
-        # Convert image data to base64
-        base64_image = base64.b64encode(image_data).decode('utf-8')
-        
-        # Create message with file attachment
+        # Upload file
+        with open(file_path, "rb") as file:
+            file_obj = client.files.create(
+                file=file,
+                purpose="assistants"
+            )
+
+        # Create completion
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{base64_image}"
-                            }
-                        }
-                    ],
-                }
-            ],
-            max_tokens=1000,
+            model="gpt-4",  # Updated model name
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }],
+            file_ids=[file_obj.id]
         )
         
-        return response.choices[0].message.content
+        # Extract content
+        if hasattr(response, 'choices') and response.choices:
+            return response.choices[0].message.content
+        return "No response generated"
         
-    except FileNotFoundError:
-        raise Exception("File not found")
     except OpenAIError as e:
-        raise Exception(f"OpenAI API error: {str(e)}")
+        print(f"OpenAI API Error: {str(e)}")
+        raise
     except Exception as e:
-        raise Exception(f"Error processing file: {str(e)}")
+        print(f"Error in generate_w_pdfs: {str(e)}")
+        raise
 
-    
 @app.route("/suggest", methods=["POST"])
 def suggest():
     try:
