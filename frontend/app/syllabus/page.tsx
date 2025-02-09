@@ -7,6 +7,8 @@ export default function SyllabusUpload() {
   const [subject, setSubject] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [suggestion, setSuggestion] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -21,6 +23,7 @@ export default function SyllabusUpload() {
   const handleDeleteFile = () => {
     setFile(null)
     setPdfUrl(null)
+    setSuggestion(null)
   }
 
   const handleUpload = async () => {
@@ -33,21 +36,42 @@ export default function SyllabusUpload() {
       return
     }
 
+    setLoading(true)
     const formData = new FormData()
     formData.append('file', file)
     formData.append('subject', subject)
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/upload', {
+      // First upload the file
+      const uploadResponse = await fetch('http://127.0.0.1:5000/upload', {
         method: 'POST',
         body: formData,
       })
-      const data = await response.json()
-      if (data.file_url) {
-        setPdfUrl(data.file_url)
+      const uploadData = await uploadResponse.json()
+      
+      if (uploadData.filename) {
+        // Then get suggestions with the subject
+        const suggestionResponse = await fetch('http://127.0.0.1:5000/content-suggest', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            filename: uploadData.filename,
+            subject: subject
+          }),
+        })
+        const suggestionData = await suggestionResponse.json()
+        
+        if (suggestionData.suggestion) {
+          setSuggestion(suggestionData.suggestion)
+        }
       }
     } catch (error) {
-      console.error('Error uploading file:', error)
+      console.error('Error processing file:', error)
+      alert('Error processing file. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -112,11 +136,22 @@ export default function SyllabusUpload() {
 
           {/* Generate Button */}
           <button
-            className="w-full bg-black text-white font-bold py-4 px-6 rounded-lg"
+            className="w-full bg-black text-white font-bold py-4 px-6 rounded-lg disabled:bg-gray-400"
             onClick={handleUpload}
+            disabled={loading}
           >
-            Generate Suggestions
+            {loading ? 'Processing...' : 'Generate Suggestions'}
           </button>
+
+          {/* Suggestions Display */}
+          {suggestion && (
+            <div className="bg-white rounded-lg p-6">
+              <h2 className="text-lg font-medium mb-4">Suggestions:</h2>
+              <div className="prose max-w-none">
+                {suggestion}
+              </div>
+            </div>
+          )}
 
           {/* PDF Preview */}
           {pdfUrl && (
