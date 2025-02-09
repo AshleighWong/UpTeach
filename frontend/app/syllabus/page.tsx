@@ -107,7 +107,7 @@ export default function SyllabusUpload() {
 
           {file && (
             <div className="bg-white rounded-lg p-4">
-              <h2 className="text-lg font-medium mb-4">Uploaded Files:</h2>
+              <h2 className="text-lg font-medium mb-4 text-black">Uploaded Files:</h2>
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <FileText className="w-5 h-5 text-gray-500" />
@@ -131,7 +131,7 @@ export default function SyllabusUpload() {
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-lg"
+              className="w-full p-3 border border-gray-200 rounded-lg text-black"
               placeholder="Enter subject name"
             />
           </div>
@@ -161,8 +161,8 @@ export default function SyllabusUpload() {
 
               {suggestion && (
                 <div className="flex-1 bg-white rounded-lg p-6 h-96 overflow-y-auto">
-                  <h2 className="text-lg font-medium mb-4">Suggestions:</h2>
-                  <div className="prose max-w-none">
+                  <h2 className="text-lg font-medium mb-4 text-black">Suggestions:</h2>
+                  <div className="prose max-w-none text-black">
                     <ReactMarkdown>{suggestion}</ReactMarkdown>
                   </div>
                 </div>
