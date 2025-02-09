@@ -10,6 +10,11 @@ from PIL import Image
 import io
 import traceback
 import PyPDF2
+from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+from PIL import Image
+import io
+import json
 
 app = Flask(__name__)
 
@@ -51,22 +56,65 @@ client = OpenAI(
 
 def convert_pptx_to_image(pptx_path, slide_index=0):
     """Convert a PowerPoint slide to an image"""
-    prs = Presentation(pptx_path)
-    if slide_index >= len(prs.slides):
-        raise ValueError("Slide index out of range")
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        prs = Presentation(pptx_path)
+        if slide_index >= len(prs.slides):
+            raise ValueError("Slide index out of range")
 
-    # Create a temporary buffer to save the slide as PNG
-    image_stream = io.BytesIO()
-    # TODO: Add conversion logic here - requires additional setup
-    # For now, we'll use a placeholder image
-    Image.new("RGB", (800, 600), "white").save(image_stream, format="PNG")
-    image_stream.seek(0)
-    return image_stream.getvalue()
+        slide = prs.slides[slide_index]
+        
+        # Get slide dimensions
+        width = int(prs.slide_width * 96 / 914400)  # convert EMU to pixels
+        height = int(prs.slide_height * 96 / 914400)
+        
+        # Create a new image with white background
+        slide_image = Image.new('RGB', (width, height), 'white')
+        draw = ImageDraw.Draw(slide_image)
+
+        # Process all shapes on the slide
+        for shape in slide.shapes:
+            # Handle text boxes
+            if hasattr(shape, "text"):
+                left = int(shape.left * 96 / 914400)
+                top = int(shape.top * 96 / 914400)
+                try:
+                    # Draw text (basic implementation)
+                    draw.text((left, top), shape.text, fill='black')
+                except Exception as e:
+                    print(f"Error drawing text: {e}")
+
+            # Handle pictures
+            if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                try:
+                    image = Image.open(io.BytesIO(shape.image.blob))
+                    left = int(shape.left * 96 / 914400)
+                    top = int(shape.top * 96 / 914400)
+                    width = int(shape.width * 96 / 914400)
+                    height = int(shape.height * 96 / 914400)
+                    image = image.resize((width, height))
+                    slide_image.paste(image, (left, top))
+                except Exception as e:
+                    print(f"Error processing image: {e}")
+
+        # Save to buffer
+        image_stream = io.BytesIO()
+        slide_image.save(image_stream, format='PNG')
+        image_stream.seek(0)
+        return image_stream.getvalue()
+
+    except Exception as e:
+        print(f"Error converting PowerPoint to image: {str(e)}")
+        traceback.print_exc()
+        raise
 
 def convert_pdf_to_image(pdf_path, page_number=0):
     """Convert a PDF page to an image"""
-    pdf = PyPDF2.PdfFileReader(pdf_path)
-    if page_number >= pdf.getNumPages():
+    print('here2')
+    print(pdf_path)
+    # Replace PdfFileReader with PdfReader
+    pdf = PyPDF2.PdfReader(pdf_path)
+    if page_number >= len(pdf.pages):
         raise ValueError("Page number out of range")
 
     # Create a temporary buffer to save the page as PNG
@@ -80,6 +128,7 @@ def convert_pdf_to_image(pdf_path, page_number=0):
 def generate_lesson(file_path, prompt):
     try:
         # Convert PowerPoint slide to image
+        print('here', file_path.rsplit(".", 1)[1].lower())
 
         if file_path.rsplit(".", 1)[1].lower() == "pptx":
             image_data = convert_pptx_to_image(file_path)
@@ -87,37 +136,56 @@ def generate_lesson(file_path, prompt):
             image_data = convert_pdf_to_image(file_path)
         else:   
             raise Exception("Invalid file format")
-
+        
         # Convert image data to base64
         base64_image = base64.b64encode(image_data).decode("utf-8")
 
         # Create message with file attachment
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o-mini",  # Updated model name
             messages=[
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": prompt},
+                        {
+                            "type": "text", 
+                            "text": prompt
+                        },
                         {
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:image/png;base64,{base64_image}"
-                            },
-                        },
-                    ],
+                            }
+                        }
+                    ]
                 }
             ],
-            max_tokens=1000,
+            max_tokens=1000
         )
 
-        return response.choices[0].message.content
+        # Extract and validate the response
+        response_content = response.choices[0].message.content
+        try:
+            # Attempt to parse as JSON first
+            json_response = json.loads(response_content)
+            return json_response
+        except json.JSONDecodeError:
+            # If not valid JSON, create a structured response
+            return [{
+                "slide": 1,
+                "suggestions": [{
+                    "content": response_content,
+                    "link": ""
+                }]
+            }]
 
     except FileNotFoundError:
         raise Exception("File not found")
     except OpenAIError as e:
         raise Exception(f"OpenAI API error: {str(e)}")
     except Exception as e:
+        print(f"Error in generate_lesson: {str(e)}")
+        traceback.print_exc()
         raise Exception(f"Error processing file: {str(e)}")
 
 
@@ -158,40 +226,33 @@ def generate_w_pdfs(file_path, prompt):
 @app.route("/lesson-plan", methods=["POST"])
 def suggest():
     try:
-        data = request.get_json()
-        if not data or "filename" not in data or "subject" not in data:
-            return jsonify({"error": "Filename and subject are required"}), 400
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400      
 
-        # Get news for the specific subject
+        file = request.files["file"]
+        subject = request.form.get("subject", "")
+
+        if not file or not subject:
+            return jsonify({"error": "File and subject are required"}), 400
+        
+        file_path = os.path.join(TEMP_DIR, file.filename)
+        file.save(file_path)
+        
         news = GetNewsContent(NEWS_API_KEY)
-        subject_news = news.get_subject_news(data["subject"], days_back=7)
-
-        file_path = os.path.join(TEMP_DIR, data["filename"]) 
+        subject_news = news.get_subject_news(subject, days_back=7)
 
         if not os.path.exists(file_path):
             return jsonify({"error": "File not found"}), 404
 
-        prompt = (
-            "Analyze this lesson plan give me suggested changes based on "
-            f"these recent news articles: {subject_news}."
-            "Only make changes if necessary, you are not forced to make changes."
-            "the changes will be returned in this format"
-            """
-            {
-                "slide": <slide_number>,
-                "suggestions": [
-                    {
-                        "content": <suggestion_text>,
-                        "link": <source_link>
-                    }
-                ]
-            }
-            """
-            "Only return json format"
-        )
+        prompt = "Analyze this lesson plan give me suggested changes based on these recent news articles: {subject_news}. Focus on incorporating current research trends and modern teaching methodologies in education. The changes will be returned in this format: { \"slide\": <slide_number>, \"suggestions\": [ { \"content\": <suggestion_text>, \"link\": <source_link> } ] }Only return json format"
+        
+
 
         response = generate_lesson(file_path, prompt)
-        return jsonify({"suggestion": response})
+        # The response is already a Python object, no need to parse it again
+        print(response[0])
+        os.remove(file_path)
+        return jsonify({"suggestion": [response[0]]})
 
     except OpenAIError as e:
         print(f"OpenAI API Error: {str(e)}")
@@ -200,6 +261,37 @@ def suggest():
         print(f"Error in /suggest endpoint: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/convert-pptx", methods=["POST"])
+def convert_pptx():
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
+
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "No selected file"}), 400
+
+        # Save the file temporarily
+        file_path = os.path.join(TEMP_DIR, file.filename)
+        file.save(file_path)
+
+        # Convert slides to images
+        prs = Presentation(file_path)
+        slides = []
+
+        for i in range(len(prs.slides)):
+            image_data = convert_pptx_to_image(file_path, i)
+            base64_image = base64.b64encode(image_data).decode('utf-8')
+            slides.append(f"data:image/png;base64,{base64_image}")
+
+        # Clean up
+        os.remove(file_path)
+
+        return jsonify({"slides": slides})
+
+    except Exception as e:
+        print(f"Error converting PPTX: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/content-suggest", methods=["POST"])
 def content_suggest():
