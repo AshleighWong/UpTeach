@@ -1,71 +1,104 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, Trash2 } from 'lucide-react'
+import { Upload, FileText, Trash2 } from 'lucide-react'
 
 export default function SyllabusUpload() {
   const [subject, setSubject] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [fileName, setFileName] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const router = useRouter()
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    
-    setFileName(file.name)
-    
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      setFile(file)
+      const localUrl = URL.createObjectURL(file)
+      setPdfUrl(localUrl)
+    }
+  }
+
+  const handleDeleteFile = () => {
+    setFile(null)
+    setPdfUrl(null)
+  }
+
+  const handleUpload = async () => {
+    if (!file) {
+      alert('Please upload a syllabus file first')
+      return
+    }
     if (!subject.trim()) {
-      setError('Please enter a subject name')
+      alert('Please enter a subject name')
       return
     }
 
-    setIsLoading(true)
-    setError('')
-    
     const formData = new FormData()
     formData.append('file', file)
     formData.append('subject', subject)
-    
+
     try {
       const response = await fetch('http://127.0.0.1:5000/upload', {
         method: 'POST',
         body: formData,
       })
-      
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to process syllabus')
+      const data = await response.json()
+      if (data.file_url) {
+        setPdfUrl(data.file_url)
       }
-      
-      const result = await response.json()
-      console.log('Upload successful:', result)
-      
-      localStorage.setItem('syllabusSubject', subject)
-      router.push('/syllabus/suggestions')
-    } catch (err) {
-      console.error('Upload error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to process syllabus')
-    } finally {
-      setIsLoading(false)
+    } catch (error) {
+      console.error('Error uploading file:', error)
     }
   }
 
-  const handleRemoveFile = () => {
-    setFileName('')
-  }
-
   return (
-    <main className="min-h-screen flex flex-col">
- <div className="bg-gray-200 py-4">
-  <h1 className="text-4xl font-extrabold font-serif text-center text-white">UpTeach</h1>
-</div>
-
-      <div className="flex-1 bg-white px-4 py-8">
+    <main className="min-h-screen flex flex-col bg-gray-100">
+      <div className="py-4">
+        <h1 className="text-4xl font-extrabold font-serif text-center">UpTeach</h1>
+      </div>
+      
+      <div className="flex-1 px-4 py-8">
         <div className="max-w-2xl mx-auto space-y-8">
-          <div className="space-y-2">
-            <label className="block text-gray-700">
+          {/* Upload Area */}
+          <div className="bg-white rounded-lg p-8">
+            <label className="block w-full cursor-pointer">
+              <input
+                type="file"
+                className="hidden"
+                accept=".pdf"
+                onChange={handleFileChange}
+              />
+              <div className="flex flex-col items-center space-y-4">
+                <Upload className="w-12 h-12 text-gray-400" />
+                <span className="text-gray-600">
+                  Click to upload syllabus
+                </span>
+              </div>
+            </label>
+          </div>
+
+          {/* Uploaded Files List */}
+          {file && (
+            <div className="bg-white rounded-lg p-4">
+              <h2 className="text-lg font-medium mb-4">Uploaded Files:</h2>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <FileText className="w-5 h-5 text-gray-500" />
+                  <span className="text-gray-700">{file.name}</span>
+                </div>
+                <button 
+                  onClick={handleDeleteFile}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Subject Input */}
+          <div className="bg-white rounded-lg p-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Type in the name of your subject
             </label>
             <input
@@ -77,69 +110,22 @@ export default function SyllabusUpload() {
             />
           </div>
 
-          {!fileName ? (
-            <div className="bg-gray-100 rounded-lg p-12 text-center">
-              <input
-                type="file"
-                onChange={handleFileUpload}
-                accept=".pdf"
-                className="hidden"
-                id="file-upload"
-                disabled={isLoading}
-              />
-              <label
-                htmlFor="file-upload"
-                className="cursor-pointer inline-flex flex-col items-center"
-              >
-                <div className="p-3 rounded-full bg-white mb-4">
-                  <Upload className="w-6 h-6 text-gray-600" />
-                </div>
-                <span className="text-gray-600 font-medium">
-                  Click to upload syllabus
-                </span>
-                <span className="text-sm text-gray-500 mt-1">
-                  or drag and drop it here
-                </span>
-              </label>
-            </div>
-          ) : (
-            <div className="border rounded-lg p-4">
-              <h2 className="font-medium text-gray-700 mb-2">Uploaded Files:</h2>
-              <div className="flex items-center justify-between bg-gray-50 p-3 rounded">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  {fileName}
-                </div>
-                <button
-                  onClick={handleRemoveFile}
-                  className="text-red-600 hover:text-red-800"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          )}
-
+          {/* Generate Button */}
           <button
-            onClick={() => {
-              if (!fileName) {
-                document.getElementById('file-upload')?.click()
-              } else {
-                router.push('/syllabus/suggestions')
-              }
-            }}
-            disabled={isLoading}
-            className="w-full bg-black text-white font-medium py-3 px-4 rounded-lg hover:bg-gray-800 disabled:bg-gray-400"
+            className="w-full bg-black text-white font-bold py-4 px-6 rounded-lg"
+            onClick={handleUpload}
           >
             Generate Suggestions
           </button>
 
-          {error && (
-            <div className="text-red-600 text-center p-2 bg-red-50 rounded-lg">
-              {error}
+          {/* PDF Preview */}
+          {pdfUrl && (
+            <div className="border border-gray-200 rounded-lg bg-white">
+              <iframe
+                src={pdfUrl}
+                className="w-full h-[600px] rounded-lg"
+                title="PDF Viewer"
+              />
             </div>
           )}
         </div>
