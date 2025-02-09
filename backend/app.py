@@ -10,6 +10,12 @@ from PIL import Image
 import io
 import traceback
 import PyPDF2
+from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+from PIL import Image
+import io
+import json
+from pdf2image import convert_from_path
 
 app = Flask(__name__)
 
@@ -24,13 +30,13 @@ NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 UPLOAD_FOLDER = "uploads"
 TEMP_DIR = "temp"  # Add this line
 
-ALLOWED_EXTENSIONS = {"pdf"}
+ALLOWED_EXTENSIONS = {"pdf", "pptx"}
 
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
-if not os.path.exists(TEMP_DIR):  # Add this line
-    os.makedirs(TEMP_DIR)  # Add this line
+if not os.path.exists(TEMP_DIR): 
+    os.makedirs(TEMP_DIR)  
 
 
 def allowed_file(filename):
@@ -49,56 +55,144 @@ client = OpenAI(
 )
 
 
-def convert_slide_to_image(pptx_path, slide_index=0):
+def convert_pptx_to_image(pptx_path, slide_index=0):
     """Convert a PowerPoint slide to an image"""
-    prs = Presentation(pptx_path)
-    if slide_index >= len(prs.slides):
-        raise ValueError("Slide index out of range")
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        prs = Presentation(pptx_path)
+        if slide_index >= len(prs.slides):
+            raise ValueError("Slide index out of range")
 
-    # Create a temporary buffer to save the slide as PNG
+        slide = prs.slides[slide_index]
+        
+        # Get slide dimensions
+        width = int(prs.slide_width * 96 / 914400)  # convert EMU to pixels
+        height = int(prs.slide_height * 96 / 914400)
+        
+        # Create a new image with white background
+        slide_image = Image.new('RGB', (width, height), 'white')
+        draw = ImageDraw.Draw(slide_image)
+
+        # Process all shapes on the slide
+        for shape in slide.shapes:
+            # Handle text boxes
+            if hasattr(shape, "text"):
+                left = int(shape.left * 96 / 914400)
+                top = int(shape.top * 96 / 914400)
+                try:
+                    # Draw text (basic implementation)
+                    draw.text((left, top), shape.text, fill='black')
+                except Exception as e:
+                    print(f"Error drawing text: {e}")
+
+            # Handle pictures
+            if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                try:
+                    image = Image.open(io.BytesIO(shape.image.blob))
+                    left = int(shape.left * 96 / 914400)
+                    top = int(shape.top * 96 / 914400)
+                    width = int(shape.width * 96 / 914400)
+                    height = int(shape.height * 96 / 914400)
+                    image = image.resize((width, height))
+                    slide_image.paste(image, (left, top))
+                except Exception as e:
+                    print(f"Error processing image: {e}")
+
+        # Save to buffer
+        image_stream = io.BytesIO()
+        slide_image.save(image_stream, format='PNG')
+        image_stream.seek(0)
+        return image_stream.getvalue()
+
+    except Exception as e:
+        print(f"Error converting PowerPoint to image: {str(e)}")
+        traceback.print_exc()
+        raise
+
+def convert_pdf_to_image(pdf_path, page_number=0):
+    images = convert_from_path(pdf_path)  # returns list of PIL images
+    if page_number >= len(images):
+        raise ValueError("Page number out of range")
     image_stream = io.BytesIO()
-    # TODO: Add conversion logic here - requires additional setup
-    # For now, we'll use a placeholder image
-    Image.new("RGB", (800, 600), "white").save(image_stream, format="PNG")
+    images[page_number].save(image_stream, format="PNG")
     image_stream.seek(0)
     return image_stream.getvalue()
 
-
-def generate_w_pptx(file_path, prompt):
+def generate_lesson(file_path, prompt):
     try:
-        # Convert PowerPoint slide to image
-        image_data = convert_slide_to_image(file_path)
+        extension = file_path.rsplit(".", 1)[1].lower()
+        base64_image = ""
+        text_content = ""
 
-        # Convert image data to base64
-        base64_image = base64.b64encode(image_data).decode("utf-8")
+        # Convert file to images
+        if extension == "pptx":
+            # Extract text from PPT
+            prs = Presentation(file_path)
+            slides_text = []
+            for i, slide in enumerate(prs.slides):
+                # capture shape text
+                slide_text = []
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        slide_text.append(shape.text)
+                slides_text.append(" ".join(slide_text))
 
-        # Create message with file attachment
+            # Convert only first slide to image (example)
+            image_data = convert_pptx_to_image(file_path, 0)
+            base64_image = base64.b64encode(image_data).decode("utf-8")
+            text_content = "\n".join(slides_text)
+
+        elif extension == "pdf":
+            # Extract text from PDF
+            with open(file_path, "rb") as f:
+                pdf_reader = PyPDF2.PdfReader(f)
+                for page in pdf_reader.pages:
+                    text_content += page.extract_text() or ""
+
+            # Convert only first page to image (example)
+            image_data = convert_pdf_to_image(file_path, 0)
+            base64_image = base64.b64encode(image_data).decode("utf-8")
+        else:
+            raise Exception("Invalid file format")
+
+        # Add file content to the prompt
+        prompt_with_file = f"{prompt}\n\nFile text:\n{text_content}"
+
+        # Create message with text + base64 data
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{base64_image}"
-                            },
-                        },
+                        {"type": "text", "text": prompt_with_file},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}},
                     ],
                 }
             ],
             max_tokens=1000,
         )
 
-        return response.choices[0].message.content
+        response_content = response.choices[0].message.content
+        try:
+            json_response = json.loads(response_content)
+            return json_response
+        except json.JSONDecodeError:
+            return [{
+                "slide": 1,
+                "suggestions": [{
+                    "content": response_content,
+                    "link": ""
+                }]
+            }]
 
     except FileNotFoundError:
         raise Exception("File not found")
     except OpenAIError as e:
         raise Exception(f"OpenAI API error: {str(e)}")
     except Exception as e:
+        print(f"Error in generate_lesson: {str(e)}")
+        traceback.print_exc()
         raise Exception(f"Error processing file: {str(e)}")
 
 
@@ -136,26 +230,36 @@ def generate_w_pdfs(file_path, prompt):
         raise Exception(f"Error processing file: {str(e)}")
 
 
-@app.route("/suggest", methods=["POST"])
+@app.route("/lesson-plan", methods=["POST"])
 def suggest():
     try:
-        news = GetNewsContent(NEWS_API_KEY)
-        science_news = news.get_subject_news("biology", days_back=7)
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400      
 
-        file_path = os.path.join(
-            os.path.dirname(__file__), "2.3. no audio-- The Main Memory.pptx"
-        )
+        file = request.files["file"]
+        subject = request.form.get("subject", "")
+
+        if not file or not subject:
+            return jsonify({"error": "File and subject are required"}), 400
+        
+        file_path = os.path.join(TEMP_DIR, file.filename)
+        file.save(file_path)
+        
+        news = GetNewsContent(NEWS_API_KEY)
+        subject_news = news.get_subject_news(subject, days_back=7)
 
         if not os.path.exists(file_path):
             return jsonify({"error": "File not found"}), 404
 
-        prompt = (
-            "Analyze this presentation and suggest improvements based on "
-            f"these recent news articles: {science_news}"
-        )
+        prompt = "Analyze this lesson plan give me suggested changes based on these recent news articles: {subject_news}. Focus on incorporating current research trends and modern teaching methodologies in education. The changes will be returned in this format: { \"slide\": <slide_number>, \"suggestions\": [ { \"content\": <suggestion_text>, \"link\": <source_link> } ] }Only return json format"
+        
 
-        response = generate_w_pdfs(file_path, prompt)
-        return jsonify({"suggestion": response})
+
+        response = generate_lesson(file_path, prompt)
+        # The response is already a Python object, no need to parse it again
+        print(response[0])
+        os.remove(file_path)
+        return jsonify({"suggestion": [response[0]]})
 
     except OpenAIError as e:
         print(f"OpenAI API Error: {str(e)}")
@@ -164,6 +268,64 @@ def suggest():
         print(f"Error in /suggest endpoint: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/convert-pptx", methods=["POST"])
+def convert_pptx():
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
+
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "No selected file"}), 400
+
+        # Save the file temporarily
+        file_path = os.path.join(TEMP_DIR, file.filename)
+        file.save(file_path)
+
+        # Convert slides to images
+        prs = Presentation(file_path)
+        slides = []
+
+        for i in range(len(prs.slides)):
+            image_data = convert_pptx_to_image(file_path, i)
+            base64_image = base64.b64encode(image_data).decode('utf-8')
+            slides.append(f"data:image/png;base64,{base64_image}")
+
+        # Clean up
+        os.remove(file_path)
+
+        return jsonify({"slides": slides})
+
+    except Exception as e:
+        print(f"Error converting PPTX: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/convert-pdf", methods=["POST"])
+def convert_pdf():
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
+
+        pdf_file = request.files["file"]
+        if pdf_file.filename == "":
+            return jsonify({"error": "No selected file"}), 400
+
+        file_path = os.path.join(TEMP_DIR, pdf_file.filename)
+        pdf_file.save(file_path)
+
+        pdf_reader = PyPDF2.PdfReader(file_path)
+        slides = []
+        for i in range(len(pdf_reader.pages)):
+            image_data = convert_pdf_to_image(file_path, i)
+            base64_image = base64.b64encode(image_data).decode('utf-8')
+            slides.append(f"data:image/png;base64,{base64_image}")
+
+        os.remove(file_path)
+        return jsonify({"slides": slides})
+
+    except Exception as e:
+        print(f"Error converting PDF: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/content-suggest", methods=["POST"])
 def content_suggest():
@@ -190,6 +352,7 @@ def content_suggest():
         )
 
         response = generate_w_pdfs(file_path, prompt)
+        os.remove(file_path)
         return jsonify({"suggestion": response})
 
     except OpenAIError as e:
@@ -268,3 +431,4 @@ def mahin():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
