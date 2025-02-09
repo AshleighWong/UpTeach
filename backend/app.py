@@ -95,8 +95,22 @@ def suggest():
             return jsonify({"error": "File not found"}), 404
 
         prompt = (
-            "Analyze this presentation and suggest improvements based on "
-            f"these recent news articles: {science_news}"
+            "Analyze this lesson plan give me suggested changes based on "
+            f"these recent news articles: {science_news}."
+            "Only make changes if necessary, you are not forced to make changes."
+            "the changes will be returned in this format"
+            """
+            {
+                "slide": <slide_number>,
+                "suggestions": [
+                    {
+                        "content": <suggestion_text>,
+                        "link": <source_link>
+                    }
+                ]
+            }
+            """
+            "Only return json format"
         )
         
         response = generate_w_pdfs(file_path, prompt)
