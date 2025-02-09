@@ -350,12 +350,9 @@ def content_suggest():
             return jsonify({"error": "File not found"}), 404
 
         prompt = (
-            f"Analyze this syllabus and suggest improvements based on "
-            f"these recent news articles in {data['subject']}: {subject_news}. "
-            f"Focus on incorporating current trends if important to curriculumn "
-            f"modern teaching methodologies in {data['subject']} education."
-            f"Do not entire change the syllabus do not change structure of class do not change teaching style, only add on if necessary."
-            f"Be very specific and only return the suggestions straight to the point, and stay on the point no extra words other than suggestions"
+            f"Analyze this syllabus and suggest improvements based on new research here:"
+            f"Make sure to explicity say what to change and why with the new info, do not say with the given info pretend you know this"
+            f"Outdated: The rigid interpretation of molecular orbitals without considering electron correlation effects. Updated: The integration of advanced quantum mechanical models and machine learning in molecular structure prediction. Outdated: Classical kinetic models that assume reaction pathways are always linear. Updated: Nonlinear reaction dynamics and chaos theory applications in molecular systems. Outdated: Limited use of computational chemistry due to processing constraints. Updated: High-throughput molecular simulations enabled by quantum computing and AI-driven chemistry models."
         )
 
         response = generate_w_pdfs(file_path, prompt)
