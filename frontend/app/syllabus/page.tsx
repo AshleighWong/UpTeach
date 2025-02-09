@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload, FileText, Trash2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
@@ -11,6 +11,7 @@ export default function SyllabusUpload() {
   const [suggestion, setSuggestion] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const suggestionsRef = useRef<HTMLDivElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -43,7 +44,11 @@ export default function SyllabusUpload() {
     formData.append('subject', subject)
 
     try {
-      // First upload the file
+      suggestionsRef.current?.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      })
+
       const uploadResponse = await fetch('http://127.0.0.1:5000/upload', {
         method: 'POST',
         body: formData,
@@ -51,7 +56,6 @@ export default function SyllabusUpload() {
       const uploadData = await uploadResponse.json()
       
       if (uploadData.filename) {
-        // Then get suggestions with the subject
         const suggestionResponse = await fetch('http://127.0.0.1:5000/content-suggest', {
           method: 'POST',
           headers: {
@@ -84,7 +88,6 @@ export default function SyllabusUpload() {
       
       <div className="flex-1 px-4 py-8">
         <div className="max-w-6xl mx-auto space-y-8">
-          {/* Upload Area */}
           <div className="bg-white rounded-lg p-8">
             <label className="block w-full cursor-pointer">
               <input
@@ -102,7 +105,6 @@ export default function SyllabusUpload() {
             </label>
           </div>
 
-          {/* Uploaded Files List */}
           {file && (
             <div className="bg-white rounded-lg p-4">
               <h2 className="text-lg font-medium mb-4">Uploaded Files:</h2>
@@ -121,7 +123,6 @@ export default function SyllabusUpload() {
             </div>
           )}
 
-          {/* Subject Input */}
           <div className="bg-white rounded-lg p-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Type in the name of your subject
@@ -135,7 +136,6 @@ export default function SyllabusUpload() {
             />
           </div>
 
-          {/* Generate Button */}
           <button
             className="w-full bg-black text-white font-bold py-4 px-6 rounded-lg disabled:bg-gray-400"
             onClick={handleUpload}
@@ -144,10 +144,11 @@ export default function SyllabusUpload() {
             {loading ? 'Processing...' : 'Generate Suggestions'}
           </button>
 
-          {/* Side by Side Preview and Suggestions */}
           {(pdfUrl || suggestion) && (
-            <div className="flex flex-row gap-8">
-              {/* PDF Preview */}
+            <div 
+              ref={suggestionsRef}
+              className="flex flex-row gap-8"
+            >
               {pdfUrl && (
                 <div className="flex-1 border border-gray-200 rounded-lg bg-white">
                   <iframe
@@ -158,7 +159,6 @@ export default function SyllabusUpload() {
                 </div>
               )}
 
-              {/* Suggestions Display */}
               {suggestion && (
                 <div className="flex-1 bg-white rounded-lg p-6 h-96 overflow-y-auto">
                   <h2 className="text-lg font-medium mb-4">Suggestions:</h2>

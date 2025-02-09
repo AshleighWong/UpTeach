@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload, FileText, Trash2 } from 'lucide-react'
 
@@ -24,6 +24,7 @@ export default function SyllabusUpload() {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [suggestions, setSuggestions] = useState<SlideSuggestion[]>([])
   const router = useRouter()
+  const suggestionsRef = useRef<HTMLDivElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -171,6 +172,13 @@ export default function SyllabusUpload() {
 
             if (validSuggestions) {
               setSuggestions(parsed)
+              // Add setTimeout to ensure the suggestions are rendered before scrolling
+              setTimeout(() => {
+                suggestionsRef.current?.scrollIntoView({ 
+                  behavior: 'smooth',
+                  block: 'start'
+                })
+              }, 100)
             } else {
               throw new Error('Invalid suggestion structure')
             }
@@ -216,26 +224,29 @@ export default function SyllabusUpload() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col bg-gray-100">
-      <div className="py-4">
-        <h1 className="text-4xl font-extrabold font-serif text-center">UpTeach</h1>
+    <main className="min-h-screen flex flex-col bg-gray-50">
+      {/* Header Section */}
+      <div className="bg-white shadow-sm py-4 mb-4">
+        <h1 className="text-3xl font-bold font-serif text-center text-gray-800">
+          Lesson Plan Upload
+        </h1>
       </div>
       
-      <div className="flex-1 px-4 py-8">
-        <div className="max-w-6xl mx-auto space-y-8">
+      <div className="flex-1 px-4 py-4 max-w-7xl mx-auto w-full">
+        <div className="space-y-4"> {/* Reduced from space-y-8 to space-y-4 */}
           {/* Upload Area */}
-          <div className="bg-white rounded-lg p-8">
-            <label className="block w-full cursor-pointer">
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100"> {/* Reduced padding from p-8 to p-6 */}
+            <label className="block w-full cursor-pointer transition-all duration-200 hover:opacity-80">
               <input
                 type="file"
                 className="hidden"
                 accept=".pdf, .pptx"
                 onChange={handleFileChange}
               />
-              <div className="flex flex-col items-center space-y-4">
-                <Upload className="w-12 h-12 text-gray-400" />
-                <span className="text-gray-600">
-                  Click to upload Lesson plan
+              <div className="flex flex-col items-center space-y-3 py-8"> {/* Reduced padding and spacing */}
+                <Upload className="w-12 h-12 text-gray-400" /> {/* Reduced icon size */}
+                <span className="text-gray-600 text-base">
+                  Click to upload Lesson plan (PDF or PPTX)
                 </span>
               </div>
             </label>
@@ -243,106 +254,113 @@ export default function SyllabusUpload() {
 
           {/* Uploaded Files List */}
           {file && (
-            <div className="bg-white rounded-lg p-4">
-              <h2 className="text-lg font-medium mb-4">Uploaded Files:</h2>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100"> {/* Reduced padding */}
+              <h2 className="text-lg font-semibold text-gray-800 mb-2"> {/* Reduced margin and font size */}
+                Uploaded File
+              </h2>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
                 <div className="flex items-center space-x-3">
                   <FileText className="w-5 h-5 text-gray-500" />
-                  <span className="text-gray-700">{file.name}</span>
+                  <span className="text-gray-700 font-medium">{file.name}</span>
                 </div>
                 <button 
                   onClick={handleDeleteFile}
-                  className="text-red-500 hover:text-red-700"
+                  className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-200"
                 >
-                  <Trash2 className="w-5 h-5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
           )}
 
           {/* Subject Input */}
-          <div className="bg-white rounded-lg p-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Type in the name of your subject
+          <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100"> {/* Reduced padding */}
+            <label className="block text-base font-medium text-gray-700 mb-2"> {/* Reduced margin and font size */}
+              Subject Name
             </label>
             <input
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-lg"
-              placeholder="Enter subject name"
+              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200 text-black" // Added text-black
+              placeholder="Enter the name of your subject"
             />
           </div>
 
           {/* Generate Button */}
           <button
-            className="w-full bg-black text-white font-bold py-4 px-6 rounded-lg disabled:bg-gray-400"
+            className="w-full bg-black text-white font-bold py-3 px-6 rounded-xl text-base transition-all duration-200 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed shadow-sm"
             onClick={handleUpload}
             disabled={loading}
           >
             {loading ? 'Processing...' : 'Generate Suggestions'}
           </button>
 
-          {/* Modified Preview and Suggestions Section */}
+          {/* Preview and Suggestions Section */}
           {(pdfUrl || slideImages.length > 0 || suggestions.length > 0) && (
-            <div className="flex flex-row gap-8">
+            <div 
+              ref={suggestionsRef}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-4"
+            >
               {/* File Preview */}
-              <div className="flex-1 border border-gray-200 rounded-lg bg-white">
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-800 mb-4">Preview</h2>
                 {((fileType === 'pdf' || fileType === 'pptx') && slideImages.length > 0) ? (
-                  <div className="relative w-full h-96">
-                    <img
-                      src={slideImages[currentSlide]}
-                      alt={`Page ${currentSlide + 1}`}
-                      className="w-full h-full object-contain rounded-lg"
-                      style={{ backgroundColor: 'white' }}
-                    />
-                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
+                  <div className="relative">
+                    <div className="aspect-[4/3] mb-4">
+                      <img
+                        src={slideImages[currentSlide]}
+                        alt={`Page ${currentSlide + 1}`}
+                        className="w-full h-full object-contain rounded-lg bg-gray-50"
+                      />
+                    </div>
+                    <div className="flex justify-center items-center gap-4 mt-4">
                       <button
                         onClick={prevSlide}
                         disabled={currentSlide === 0}
-                        className="px-4 py-2 bg-black text-white rounded disabled:bg-gray-400"
+                        className="px-6 py-2 bg-gray-800 text-white rounded-lg disabled:bg-gray-300 transition-colors duration-200"
                       >
                         Previous
                       </button>
-                      <span className="py-2">
+                      <span className="text-lg font-medium text-black"> {/* Added text-black */}
                         {currentSlide + 1} / {slideImages.length}
                       </span>
                       <button
                         onClick={nextSlide}
                         disabled={currentSlide === slideImages.length - 1}
-                        className="px-4 py-2 bg-black text-white rounded disabled:bg-gray-400"
+                        className="px-6 py-2 bg-gray-800 text-white rounded-lg disabled:bg-gray-300 transition-colors duration-200"
                       >
                         Next
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-96 bg-gray-50">
-                    <p className="text-gray-500">No pages available</p>
+                  <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg">
+                    <p className="text-gray-500 text-lg">No preview available</p>
                   </div>
                 )}
               </div>
 
-              {/* Updated Suggestions Display */}
-              <div className="flex-1 bg-white rounded-lg p-6 h-96 overflow-y-auto">
-                <h2 className="text-lg font-medium mb-4">
-                  Suggestions for {fileType === 'pdf' ? 'Page' : 'Slide'} {currentSlide + 1}:
+              {/* Suggestions Display */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-800 mb-4">
+                  Suggestions for {fileType === 'pdf' ? 'Page' : 'Slide'} {currentSlide + 1}
                 </h2>
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
                   {getCurrentSuggestions().map((slideSuggestion, idx) => (
-                    <div key={idx} className="mb-4">
+                    <div key={idx}>
                       {Array.isArray(slideSuggestion.suggestions) && 
                         slideSuggestion.suggestions.map((suggestion, subIdx) => (
-                          <div key={`${idx}-${subIdx}`} className="mb-4 p-4 bg-gray-50 rounded-lg">
-                            <p className="text-gray-700 mb-2">{suggestion.content}</p>
+                          <div key={`${idx}-${subIdx}`} className="mb-4 p-5 bg-gray-50 rounded-xl border border-gray-100">
+                            <p className="text-gray-700 text-lg mb-3">{suggestion.content}</p>
                             {suggestion.link && (
                               <a 
                                 href={suggestion.link}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-500 hover:text-blue-700 text-sm"
+                                className="inline-block text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200"
                               >
-                                Source Link
+                                View Resource →
                               </a>
                             )}
                           </div>
@@ -350,7 +368,7 @@ export default function SyllabusUpload() {
                     </div>
                   ))}
                   {getCurrentSuggestions().length === 0 && (
-                    <p className="text-gray-500">
+                    <p className="text-gray-500 text-lg text-center py-8">
                       No suggestions available for this {fileType === 'pdf' ? 'page' : 'slide'}.
                     </p>
                   )}
