@@ -3,35 +3,42 @@ import Link from 'next/link'
 
 export default function Home() {
   return (
-    <main className="min-h-screen flex flex-col">
-      {/* Header Section */}
-      <div className="bg-gray-300 py-4">
-        <h1 className="text-4xl font-extrabold font-serif text-center">Welcome to UpTeach!</h1>
+    <main className="min-h-screen flex flex-col bg-gray-100">
+
+      {/* Main Content Section */}
+      <div className="flex-grow flex flex-col items-center justify-center gap-12 px-4">
+        <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-3xl">
+          <h2 className="text-2xl font-bold font-serif text-center text-gray-800 mb-2">
+            What Would You Like to Upload?
+          </h2>
+          <p className="text-center text-gray-600 mb-8">
+            Choose an option below to get started with your educational content
+          </p>
+
+          {/* Buttons Section */}
+          <div className="flex flex-col sm:flex-row justify-center gap-6">
+            <Link 
+              href="/syllabus"
+              className="bg-black text-white font-serif font-bold py-4 px-8 rounded-xl text-center text-lg hover:bg-gray-800 transition-colors duration-200 flex-1 max-w-xs mx-auto"
+            >
+              Upload a Syllabus
+            </Link>
+            <Link
+              href="/lesson"
+              className="bg-black text-white font-serif font-bold py-4 px-8 rounded-xl text-center text-lg hover:bg-gray-800 transition-colors duration-200 flex-1 max-w-xs mx-auto"
+            >
+              Upload Lesson
+            </Link>
+          </div>
+        </div>
       </div>
 
-      {/* White Middle Section */}
-      <div className="bg-white pt-28 pb-0">
-        <h2 className="text-center font-black font-serif text-lg">What Would you Like to Update ?</h2>
+      {/* Footer Section */}
+      <div className="bg-gray-300 py-6 mt-auto">
+        <p className="text-center text-gray-600 text-sm">
+          © {new Date().getFullYear()} UpTeach. All rights reserved.
+        </p>
       </div>
-
-      {/* Buttons Section */}
-      <div className="bg-gray-300 pt-28 pb-28">
-      <div className="max-w-2xl mx-auto px-4 flex justify-between gap-8">
-        <Link 
-          href="/syllabus"
-          className="bg-black text-white font-serif font-bold py-3 px-12 rounded-3xl text-center text-lg"
-        >
-          Upload a Syllabus
-        </Link>
-        <Link
-          href="/lesson"
-          className="bg-black text-white font-serif font-bold py-3 px-12 rounded-3xl text-center text-lg"
-        >
-          Upload Lesson
-        </Link>
-      </div>
-    </div>
-
     </main>
   )
 }
