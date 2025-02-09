@@ -82,7 +82,7 @@ export default function SyllabusUpload() {
       </div>
       
       <div className="flex-1 px-4 py-8">
-        <div className="max-w-2xl mx-auto space-y-8">
+        <div className="max-w-6xl mx-auto space-y-8">
           {/* Upload Area */}
           <div className="bg-white rounded-lg p-8">
             <label className="block w-full cursor-pointer">
@@ -143,24 +143,29 @@ export default function SyllabusUpload() {
             {loading ? 'Processing...' : 'Generate Suggestions'}
           </button>
 
-          {/* Suggestions Display */}
-          {suggestion && (
-            <div className="bg-white rounded-lg p-6">
-              <h2 className="text-lg font-medium mb-4">Suggestions:</h2>
-              <div className="prose max-w-none">
-                {suggestion}
-              </div>
-            </div>
-          )}
+          {/* Side by Side Preview and Suggestions */}
+          {(pdfUrl || suggestion) && (
+            <div className="flex flex-row gap-8">
+              {/* PDF Preview */}
+              {pdfUrl && (
+                <div className="flex-1 border border-gray-200 rounded-lg bg-white">
+                  <iframe
+                    src={pdfUrl}
+                    className="w-full h-96 rounded-lg"
+                    title="PDF Viewer"
+                  />
+                </div>
+              )}
 
-          {/* PDF Preview */}
-          {pdfUrl && (
-            <div className="border border-gray-200 rounded-lg bg-white">
-              <iframe
-                src={pdfUrl}
-                className="w-full h-[600px] rounded-lg"
-                title="PDF Viewer"
-              />
+              {/* Suggestions Display */}
+              {suggestion && (
+                <div className="flex-1 bg-white rounded-lg p-6 h-96 overflow-y-auto">
+                  <h2 className="text-lg font-medium mb-4">Suggestions:</h2>
+                  <div className="prose max-w-none">
+                    {suggestion}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
