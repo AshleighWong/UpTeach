@@ -255,7 +255,7 @@ def suggest():
         if not os.path.exists(file_path):
             return jsonify({"error": "File not found"}), 404
 
-        prompt = 'Analyze this lesson plan give me suggested changes based on these recent news articles: {subject_news}. Focus on incorporating current research trends and modern teaching methodologies in education. The changes will be returned in this format: { "slide": <slide_number>, "suggestions": [ { "content": <suggestion_text>, "link": <source_link> } ] }Only return json format'
+        prompt = "Analyze this lesson plan give me suggested changes based on the new research that Vitamin C is not as effective as people think. Use real research. Make sure the sources are real and give real links that lead somewhere"
 
         response = generate_lesson(file_path, prompt)
         # The response is already a Python object, no need to parse it again
