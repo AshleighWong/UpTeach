@@ -15,6 +15,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 from PIL import Image
 import io
 import json
+from pdf2image import convert_from_path
 
 app = Flask(__name__)
 
@@ -109,68 +110,74 @@ def convert_pptx_to_image(pptx_path, slide_index=0):
         raise
 
 def convert_pdf_to_image(pdf_path, page_number=0):
-    """Convert a PDF page to an image"""
-    print('here2')
-    print(pdf_path)
-    # Replace PdfFileReader with PdfReader
-    pdf = PyPDF2.PdfReader(pdf_path)
-    if page_number >= len(pdf.pages):
+    images = convert_from_path(pdf_path)  # returns list of PIL images
+    if page_number >= len(images):
         raise ValueError("Page number out of range")
-
-    # Create a temporary buffer to save the page as PNG
     image_stream = io.BytesIO()
-
-    Image.new("RGB", (800, 600), "white").save(image_stream, format="PNG")
+    images[page_number].save(image_stream, format="PNG")
     image_stream.seek(0)
     return image_stream.getvalue()
 
-
 def generate_lesson(file_path, prompt):
     try:
-        # Convert PowerPoint slide to image
-        print('here', file_path.rsplit(".", 1)[1].lower())
+        extension = file_path.rsplit(".", 1)[1].lower()
+        base64_image = ""
+        text_content = ""
 
-        if file_path.rsplit(".", 1)[1].lower() == "pptx":
-            image_data = convert_pptx_to_image(file_path)
-        elif file_path.rsplit(".", 1)[1].lower() == "pdf":
-            image_data = convert_pdf_to_image(file_path)
-        else:   
+        # Convert file to images
+        if extension == "pptx":
+            # Extract text from PPT
+            prs = Presentation(file_path)
+            slides_text = []
+            for i, slide in enumerate(prs.slides):
+                # capture shape text
+                slide_text = []
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        slide_text.append(shape.text)
+                slides_text.append(" ".join(slide_text))
+
+            # Convert only first slide to image (example)
+            image_data = convert_pptx_to_image(file_path, 0)
+            base64_image = base64.b64encode(image_data).decode("utf-8")
+            text_content = "\n".join(slides_text)
+
+        elif extension == "pdf":
+            # Extract text from PDF
+            with open(file_path, "rb") as f:
+                pdf_reader = PyPDF2.PdfReader(f)
+                for page in pdf_reader.pages:
+                    text_content += page.extract_text() or ""
+
+            # Convert only first page to image (example)
+            image_data = convert_pdf_to_image(file_path, 0)
+            base64_image = base64.b64encode(image_data).decode("utf-8")
+        else:
             raise Exception("Invalid file format")
-        
-        # Convert image data to base64
-        base64_image = base64.b64encode(image_data).decode("utf-8")
 
-        # Create message with file attachment
+        # Add file content to the prompt
+        prompt_with_file = f"{prompt}\n\nFile text:\n{text_content}"
+
+        # Create message with text + base64 data
         response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Updated model name
+            model="gpt-4o-mini",
             messages=[
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "text", 
-                            "text": prompt
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{base64_image}"
-                            }
-                        }
-                    ]
+                        {"type": "text", "text": prompt_with_file},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}},
+                    ],
                 }
             ],
-            max_tokens=1000
+            max_tokens=1000,
         )
 
-        # Extract and validate the response
         response_content = response.choices[0].message.content
         try:
-            # Attempt to parse as JSON first
             json_response = json.loads(response_content)
             return json_response
         except json.JSONDecodeError:
-            # If not valid JSON, create a structured response
             return [{
                 "slide": 1,
                 "suggestions": [{
@@ -291,6 +298,33 @@ def convert_pptx():
 
     except Exception as e:
         print(f"Error converting PPTX: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/convert-pdf", methods=["POST"])
+def convert_pdf():
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
+
+        pdf_file = request.files["file"]
+        if pdf_file.filename == "":
+            return jsonify({"error": "No selected file"}), 400
+
+        file_path = os.path.join(TEMP_DIR, pdf_file.filename)
+        pdf_file.save(file_path)
+
+        pdf_reader = PyPDF2.PdfReader(file_path)
+        slides = []
+        for i in range(len(pdf_reader.pages)):
+            image_data = convert_pdf_to_image(file_path, i)
+            base64_image = base64.b64encode(image_data).decode('utf-8')
+            slides.append(f"data:image/png;base64,{base64_image}")
+
+        os.remove(file_path)
+        return jsonify({"slides": slides})
+
+    except Exception as e:
+        print(f"Error converting PDF: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/content-suggest", methods=["POST"])

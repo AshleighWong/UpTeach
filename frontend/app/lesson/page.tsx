@@ -29,20 +29,43 @@ export default function SyllabusUpload() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
       setFile(file)
-      
-      // Determine file type
-      const fileExtension = file.name.split('.').pop()?.toLowerCase()
-      setFileType(fileExtension === 'pdf' ? 'pdf' : 'pptx')
 
+      const fileExtension = file.name.split('.').pop()?.toLowerCase()
       if (fileExtension === 'pdf') {
-        const localUrl = URL.createObjectURL(file)
-        setPdfUrl(localUrl)
-        setSlideImages([])
+        setFileType('pdf')
+        handlePdfConversion(file)
       } else {
-        setPdfUrl(null)
-        // Convert PPTX to images on the backend
+        setFileType('pptx')
         handlePptxConversion(file)
       }
+    }
+  }
+
+  const handlePdfConversion = async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('subject', subject)
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/convert-pdf', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data.slides && Array.isArray(data.slides)) {
+        setSlideImages(data.slides)
+      } else {
+        throw new Error('Invalid response format for PDF')
+      }
+    } catch (error) {
+      console.error('Error converting PDF:', error)
+      alert('Error converting PDF file: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      setSlideImages([])
     }
   }
 
@@ -265,24 +288,13 @@ export default function SyllabusUpload() {
             <div className="flex flex-row gap-8">
               {/* File Preview */}
               <div className="flex-1 border border-gray-200 rounded-lg bg-white">
-                {fileType === 'pdf' && pdfUrl && (
-                  <iframe
-                    src={pdfUrl}
-                    className="w-full h-96 rounded-lg"
-                    title="PDF Viewer"
-                  />
-                )}
-                {fileType === 'pptx' && slideImages && slideImages.length > 0 ? (
+                {((fileType === 'pdf' || fileType === 'pptx') && slideImages.length > 0) ? (
                   <div className="relative w-full h-96">
                     <img
                       src={slideImages[currentSlide]}
-                      alt={`Slide ${currentSlide + 1}`}
+                      alt={`Page ${currentSlide + 1}`}
                       className="w-full h-full object-contain rounded-lg"
                       style={{ backgroundColor: 'white' }}
-                      onError={(e) => {
-                        console.error('Error loading image:', e)
-                        e.currentTarget.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' // Empty image
-                      }}
                     />
                     <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
                       <button
@@ -306,7 +318,7 @@ export default function SyllabusUpload() {
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-96 bg-gray-50">
-                    <p className="text-gray-500">No slides available</p>
+                    <p className="text-gray-500">No pages available</p>
                   </div>
                 )}
               </div>
