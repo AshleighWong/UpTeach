@@ -352,6 +352,7 @@ def content_suggest():
         )
 
         response = generate_w_pdfs(file_path, prompt)
+        os.remove(file_path)
         return jsonify({"suggestion": response})
 
     except OpenAIError as e:

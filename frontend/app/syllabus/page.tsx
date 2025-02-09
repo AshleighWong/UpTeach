@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload, FileText, Trash2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 
 export default function SyllabusUpload() {
   const [subject, setSubject] = useState('')
@@ -162,7 +163,7 @@ export default function SyllabusUpload() {
                 <div className="flex-1 bg-white rounded-lg p-6 h-96 overflow-y-auto">
                   <h2 className="text-lg font-medium mb-4">Suggestions:</h2>
                   <div className="prose max-w-none">
-                    {suggestion}
+                    <ReactMarkdown>{suggestion}</ReactMarkdown>
                   </div>
                 </div>
               )}
