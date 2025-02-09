@@ -158,13 +158,13 @@ def upload_file():
         file.save(file_path)
         print(f"File saved at: {file_path}")
 
-        # # Read and print the first few bytes of the file (for debugging)
-        # with open(file_path, "rb") as f:
-        #     content = f.read(100)
-        #     print(f"First 100 bytes: {content}")
+        # Read and print the first few bytes of the file (for debugging)
+        with open(file_path, "rb") as f:
+            content = f.read(100)
+            print(f"First 100 bytes: {content}")
 
-        # # Clean up - remove the file after processing
-        # os.remove(file_path)
+        # Clean up - remove the file after processing
+        os.remove(file_path)
 
         response = jsonify(
             {
