@@ -88,7 +88,7 @@ export default function SyllabusUpload() {
       
       <div className="flex-1 px-4 py-8">
         <div className="max-w-6xl mx-auto space-y-8">
-          <div className="bg-white rounded-lg p-8">
+          <div className="bg-gray-200 rounded-lg p-8">
             <label className="block w-full cursor-pointer">
               <input
                 type="file"

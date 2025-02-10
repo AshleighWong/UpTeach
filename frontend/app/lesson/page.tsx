@@ -235,7 +235,7 @@ export default function SyllabusUpload() {
       <div className="flex-1 px-4 py-4 max-w-7xl mx-auto w-full">
         <div className="space-y-4"> {/* Reduced from space-y-8 to space-y-4 */}
           {/* Upload Area */}
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100"> {/* Reduced padding from p-8 to p-6 */}
+          <div className="bg-gray-200 rounded-xl shadow-sm p-6 border border-gray-100"> {/* Reduced padding from p-8 to p-6 */}
             <label className="block w-full cursor-pointer transition-all duration-200 hover:opacity-80">
               <input
                 type="file"
